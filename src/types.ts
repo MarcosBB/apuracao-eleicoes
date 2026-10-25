@@ -17,6 +17,8 @@ export interface Apuracao {
   secoesTotalizadas: number
   pctSecoes: number
   eleitorado: number
+  // Eleitores das seções ainda não totalizadas.
+  eleitoradoNaoApurado: number
   comparecimento: number
   abstencao: number
   pctComparecimento: number
@@ -25,6 +27,7 @@ export interface Apuracao {
   brancos: number
   nulos: number
   totalizacaoFinal: boolean
+  andamento: 'nao-iniciada' | 'parcial' | 'final'
   matematicamenteDefinida: boolean
   candidatos: Candidato[]
 }
@@ -43,6 +46,12 @@ export interface ResumoCargo {
   candidatos: Candidato[]
 }
 
+export interface ResumoEstado {
+  // Sigla em minúsculas (ex.: "rn").
+  sigla: string
+  cargos: ResumoCargo[]
+}
+
 export interface CandidatoUf {
   nome: string
   partido: string
@@ -57,13 +66,29 @@ export interface LiderUf {
   segundo: CandidatoUf | null
 }
 
+export interface OpcaoEleicao {
+  ano: number
+  turno: 1 | 2
+  // Data da votação (AAAA-MM-DD).
+  data: string
+  // true: API de resultados ao vivo; false: dados abertos (resultado final).
+  aoVivo: boolean
+}
+
 export interface RespostaApi {
+  eleicao: OpcaoEleicao
   atual: Apuracao | null
   historico: PontoHistorico[]
   ultimaBusca: string | null
   erro: string | null
-  uf: { sigla: string; cargos: ResumoCargo[] }
+  // Resumo por estado dos cargos estaduais e de deputado: só os estados pedidos (?uf=rn ou ?uf=todos).
+  estados: ResumoEstado[]
   mapas: { presidente: Record<string, LiderUf>; governador: Record<string, LiderUf> }
+  // Mensagem enquanto parte dos dados ainda está sendo baixada do TSE.
+  carregando: string | null
+  // Apuração encerrada: o servidor não busca mais e a página não precisa atualizar.
+  encerrada: boolean
   fonte: string
-  intervaloMs: number
+  // Intervalo de captura do servidor; null quando não há mais capturas.
+  intervaloMs: number | null
 }

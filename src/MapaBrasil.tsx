@@ -38,7 +38,16 @@ const fmtPct2 = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maxim
 const corDo = (l: LiderUf | undefined) =>
   !l?.lider ? COR_SEM_VOTOS : (CORES_PARTIDO[l.lider.partido] ?? COR_OUTROS)
 
-export default function MapaBrasil({ titulo, dados }: { titulo: string; dados: Record<string, LiderUf> }) {
+export default function MapaBrasil({
+  titulo,
+  dados,
+  rotuloAusente,
+}: {
+  titulo: string
+  dados: Record<string, LiderUf>
+  // Legenda para estados sem arquivo no TSE (ex.: sem 2º turno para governador).
+  rotuloAusente?: string
+}) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [centros, setCentros] = useState<Record<string, [number, number]>>({})
   const [ativo, setAtivo] = useState<{ uf: string; x: number; y: number } | null>(null)
@@ -61,6 +70,8 @@ export default function MapaBrasil({ titulo, dados }: { titulo: string; dados: R
     item.n++
     legenda.set(rotulo, item)
   }
+  const ausentes = brasil.locations.filter((l) => !dados[l.id]).length
+  if (rotuloAusente && ausentes) legenda.set(rotuloAusente, { cor: COR_SEM_VOTOS, n: ausentes })
   const itensLegenda = [...legenda.entries()].sort((a, b) => b[1].n - a[1].n)
 
   const info = ativo ? dados[ativo.uf] : undefined
