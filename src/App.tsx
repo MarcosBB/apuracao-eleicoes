@@ -19,8 +19,8 @@ import type { Apuracao, Candidato, OpcaoEleicao, PontoHistorico, RespostaApi, Re
 // intervalo; ele só vai à rede quando a última captura venceu (20 s / 60 s).
 const TIQUE_MS = 1_000
 const MAX_BARRAS = 5
-// Candidatos com cor própria (linhas e barras); os demais ficam neutros.
-const DESTAQUES = 3
+// Candidatos com linha no gráfico de evolução.
+const LINHAS_EVOLUCAO = 3
 
 const fmtInt = new Intl.NumberFormat('pt-BR')
 const fmtPct = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -124,9 +124,9 @@ export default function App() {
     setSelecao(s)
   }
 
-  // Cor do partido para os 3 primeiros colocados (a mesma dos mapas).
+  // Cor do partido para os candidatos exibidos (a mesma dos mapas).
   const cores = useMemo(
-    () => coresDosCandidatos(dados?.atual?.candidatos.slice(0, DESTAQUES) ?? []),
+    () => coresDosCandidatos(dados?.atual?.candidatos.slice(0, MAX_BARRAS) ?? []),
     [dados?.atual],
   )
 
@@ -702,7 +702,7 @@ function Evolucao({
   cores: Map<string, string>
   segundoTurno: boolean
 }) {
-  const destaque = atual.candidatos.filter((c) => cores.has(c.numero))
+  const destaque = atual.candidatos.slice(0, LINHAS_EVOLUCAO).filter((c) => cores.has(c.numero))
   const pontos = historico.map((p) => {
     const linha: Record<string, number | string> = {
       hora: fmtHora.format(new Date(p.atualizadoEm)).slice(0, 5),
