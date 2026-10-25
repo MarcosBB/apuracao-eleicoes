@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts'
 import { ESTADOS, nomeUf } from './estados'
+import { coresDosCandidatos } from './cores'
 import MapaBrasil from './MapaBrasil'
 import { aoAtualizar, consultar, listarEleicoes } from './tse'
 import type { Apuracao, Candidato, OpcaoEleicao, PontoHistorico, RespostaApi, ResumoEstado } from './types'
@@ -18,7 +19,8 @@ import type { Apuracao, Candidato, OpcaoEleicao, PontoHistorico, RespostaApi, Re
 // intervalo; ele só vai à rede quando a última captura venceu (20 s / 60 s).
 const TIQUE_MS = 1_000
 const MAX_BARRAS = 5
-const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)']
+// Candidatos com cor própria (linhas e barras); os demais ficam neutros.
+const DESTAQUES = 3
 
 const fmtInt = new Intl.NumberFormat('pt-BR')
 const fmtPct = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -122,17 +124,11 @@ export default function App() {
     setSelecao(s)
   }
 
-  // Cores fixas por candidato: as 3 primeiras posições da primeira captura
-  // mantêm sua cor mesmo que a ordem mude depois.
-  const cores = useMemo(() => {
-    const mapa = new Map<string, string>()
-    const base = dados?.historico[0]?.votos
-    const ordem = base
-      ? Object.entries(base).sort((a, b) => b[1] - a[1]).map(([n]) => n)
-      : (dados?.atual?.candidatos.map((c) => c.numero) ?? [])
-    ordem.slice(0, SERIES.length).forEach((n, i) => mapa.set(n, SERIES[i]))
-    return mapa
-  }, [dados?.historico, dados?.atual])
+  // Cor do partido para os 3 primeiros colocados (a mesma dos mapas).
+  const cores = useMemo(
+    () => coresDosCandidatos(dados?.atual?.candidatos.slice(0, DESTAQUES) ?? []),
+    [dados?.atual],
+  )
 
   const atual = dados?.atual
   const eleicao = dados?.eleicao ?? (selecao ? { ...selecao, data: '', aoVivo: true } : undefined)

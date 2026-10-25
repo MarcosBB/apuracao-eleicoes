@@ -1,20 +1,10 @@
 import mapaBrasil from '@svg-maps/brazil'
 import { useLayoutEffect, useRef, useState } from 'react'
+import { CORES_PARTIDO } from './cores'
 import type { LiderUf } from './types'
 
 const brasil = mapaBrasil as unknown as { viewBox: string; locations: { id: string; name: string; path: string }[] }
 
-// Cor fixa por partido (a mesma nos dois mapas). Partidos fora da lista viram "Outros".
-const CORES_PARTIDO: Record<string, string> = {
-  PL: 'var(--series-1)',
-  PT: 'var(--series-8)',
-  PSD: 'var(--series-2)',
-  MDB: 'var(--series-3)',
-  PSB: 'var(--series-4)',
-  PP: 'var(--series-5)',
-  REPUBLICANOS: 'var(--series-6)',
-  UNIÃO: 'var(--series-7)',
-}
 const COR_OUTROS = 'var(--neutro)'
 const COR_SEM_VOTOS = 'var(--grade)'
 
