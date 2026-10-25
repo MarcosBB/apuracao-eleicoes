@@ -1,9 +1,11 @@
-import type { Apuracao, Candidato, LiderUf, ResumoCargo } from '../src/types.ts'
+import type { Apuracao, Candidato, LiderUf, ResumoCargo } from '../types.ts'
 import { registrosCsv } from './zipRemoto.ts'
 
 // Eleições anteriores: o portal de resultados só mantém o ciclo atual, então o
 // resultado final vem dos dados abertos do TSE (cdn.tse.jus.br/estatistica).
-// Nada é gravado em disco: cada ano é montado em memória na primeira consulta.
+// O CDN dos dados abertos manda o cabeçalho CORS duplicado e o navegador recusa,
+// então isto roda no deploy (scripts/gerar-anos.ts): cada ano vira um JSON
+// publicado junto com o site, sem passar pelo repositório.
 //   votacao_candidato_munzona_<ano>.zip → votos por candidato, município e zona
 //   detalhe_votacao_munzona_<ano>.zip   → eleitorado, comparecimento, brancos e nulos
 export const ANOS_DADOS_ABERTOS = [2022, 2018, 2014]
@@ -48,8 +50,6 @@ export interface ResultadoTurno {
 export interface ResultadoAno {
   turnos: Record<1 | 2, ResultadoTurno>
   data: Record<1 | 2, string>
-  carregando: string | null
-  erro: string | null
 }
 
 type Base = Omit<Candidato, 'votos' | 'pct'>
@@ -137,26 +137,10 @@ async function lerDetalhe(ano: number, arquivo: string, porUf: boolean) {
   return detalhes
 }
 
-const cache = new Map<number, ResultadoAno>()
-
-export function carregarAno(ano: number): ResultadoAno {
-  let r = cache.get(ano)
-  if (r) return r
+// Monta o resultado final do ano. `progresso` recebe mensagens de andamento.
+export async function montarAno(ano: number, progresso: (msg: string) => void = () => {}): Promise<ResultadoAno> {
   const vazio = (): ResultadoTurno => ({ atual: null, estados: {}, mapas: { presidente: {}, governador: {} } })
-  r = { turnos: { 1: vazio(), 2: vazio() }, data: { 1: '', 2: '' }, carregando: 'Baixando resultados do TSE…', erro: null }
-  cache.set(ano, r)
-  const resultado = r
-  montar(ano, resultado).catch((e) => {
-    console.error(`[tse] falha nos dados abertos de ${ano}:`, e)
-    resultado.erro = e instanceof Error ? e.message : String(e)
-    resultado.carregando = null
-    // Permite tentar de novo na próxima consulta.
-    cache.delete(ano)
-  })
-  return r
-}
-
-async function montar(ano: number, r: ResultadoAno) {
+  const r: ResultadoAno = { turnos: { 1: vazio(), 2: vazio() }, data: { 1: '', 2: '' } }
   const urlCand = urlCandidatos(ano)
   const presidente = new Map<string, Soma>()
   const cargos = new Map<string, Soma>()
@@ -216,10 +200,6 @@ async function montar(ano: number, r: ResultadoAno) {
   // 2ª etapa (centenas de MB): os demais estados, um arquivo por UF.
   const restantes = UFS.filter((uf) => uf !== UF_PRIORITARIA)
   let feitos = 0
-  const progresso = () => {
-    r.carregando = `Estados: ${feitos} de ${restantes.length} baixados do TSE…`
-  }
-  progresso()
   const fila = [...restantes]
   await Promise.all(
     Array.from({ length: PARALELO }, async () => {
@@ -227,11 +207,11 @@ async function montar(ano: number, r: ResultadoAno) {
         await lerUf(uf)
         publicar(uf)
         feitos++
-        progresso()
+        progresso(`${ano}: ${feitos} de ${restantes.length} estados`)
       }
     }),
   )
-  r.carregando = null
+  return r
 }
 
 function apuracao(d: Detalhe, candidatos: Candidato[]): Apuracao {

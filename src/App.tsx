@@ -11,11 +11,12 @@ import {
 } from 'recharts'
 import { ESTADOS, nomeUf } from './estados'
 import MapaBrasil from './MapaBrasil'
+import { aoAtualizar, consultar, listarEleicoes } from './tse'
 import type { Apuracao, Candidato, OpcaoEleicao, PontoHistorico, RespostaApi, ResumoEstado } from './types'
 
-const POLL_CLIENTE_MS = 5_000
-// Enquanto o servidor ainda baixa parte dos dados (mapas, anos anteriores).
-const POLL_CARREGANDO_MS = 2_000
+// Enquanto a apuração não terminou, a página consulta o módulo do TSE neste
+// intervalo; ele só vai à rede quando a última captura venceu (20 s / 60 s).
+const TIQUE_MS = 1_000
 const MAX_BARRAS = 5
 const SERIES = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)']
 
@@ -65,42 +66,34 @@ export default function App() {
   const [agora, setAgora] = useState(() => Date.now())
 
   useEffect(() => {
-    fetch('/api/eleicoes')
-      .then((r) => r.json())
+    listarEleicoes()
       .then(setOpcoes)
       .catch(() => {})
   }, [])
 
-  // Busca a eleição escolhida; para de atualizar quando a apuração já terminou.
+  // Acompanha a eleição escolhida; para de atualizar quando a apuração já terminou.
   useEffect(() => {
     let ativo = true
     let espera: ReturnType<typeof setTimeout> | undefined
-    const params = new URLSearchParams({ uf })
-    if (selecao) {
-      params.set('ano', String(selecao.ano))
-      params.set('turno', String(selecao.turno))
-    }
-    const consulta = `?${params}`
     async function carregar() {
-      let proxima: number | null = POLL_CLIENTE_MS
       try {
-        const res = await fetch(`/api/apuracao${consulta}`, { cache: 'no-store' })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const json: RespostaApi = await res.json()
+        const r = await consultar(selecao, uf)
         if (!ativo) return
-        setDados(json)
+        setDados(r)
         setErroRede(null)
-        if (json.carregando) proxima = POLL_CARREGANDO_MS
-        else if (json.encerrada) proxima = null
+        clearTimeout(espera)
+        if (!r.encerrada) espera = setTimeout(carregar, TIQUE_MS)
       } catch (e) {
         if (ativo) setErroRede(e instanceof Error ? e.message : String(e))
       }
-      if (ativo && proxima != null) espera = setTimeout(carregar, proxima)
     }
     carregar()
+    // Dados novos (captura concluída, estado baixado no worker) aparecem na hora.
+    const parar = aoAtualizar(carregar)
     return () => {
       ativo = false
       clearTimeout(espera)
+      parar()
     }
   }, [selecao, uf])
 
@@ -234,7 +227,7 @@ export default function App() {
       {mostraEvolucao && (
         <section className="card">
           <h2>Evolução da apuração</h2>
-          <p className="sub">% dos votos válidos a cada atualização do TSE capturada por este servidor</p>
+          <p className="sub">% dos votos válidos a cada atualização do TSE capturada neste navegador</p>
           <Evolucao historico={dados.historico} atual={atual} cores={cores} segundoTurno={segundoTurno} />
         </section>
       )}
@@ -260,7 +253,7 @@ export default function App() {
         </a>
         .{' '}
         {dados.intervaloMs
-          ? `O servidor captura os dados a cada ${dados.intervaloMs / 1000} segundos. `
+          ? `A página busca os dados no TSE a cada ${dados.intervaloMs / 1000} segundos. `
           : 'Apuração encerrada: a página não se atualiza sozinha. '}
         Mapa: @svg-maps/brazil (CC BY 4.0).
       </footer>

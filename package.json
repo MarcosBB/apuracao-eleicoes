@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "start": "vite build && vite preview"
+    "start": "vite build && vite preview",
+    "anos": "node scripts/gerar-anos.ts public/anos"
   },
   "dependencies": {
     "@svg-maps/brazil": "^2.0.0",
